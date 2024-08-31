@@ -54,7 +54,7 @@ func TestLoginRequestBodyMissing(t *testing.T) {
 	}
 
 	expected := "Request body missing"
-	received := strings.TrimSpace(rr.Body.String(),)
+	received := strings.TrimSpace(rr.Body.String())
 	if received != expected {
 		t.Errorf("handler returned unexpected body: got %v want %v",
 			received, expected)
