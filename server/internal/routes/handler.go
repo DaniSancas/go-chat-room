@@ -26,7 +26,16 @@ type Handler struct {
 func (handler *Handler) login(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests
 	if r.Method != "POST" {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		responseMessage := "Invalid request method"
+		log.Printf("%s: %s", responseMessage, r.Method)
+		http.Error(w, responseMessage, http.StatusMethodNotAllowed)
+		return
+	}
+	// request body can't be nil
+	if r.Body == nil {
+		responseMessage := "Request body missing"
+		log.Print(responseMessage)
+		http.Error(w, responseMessage, http.StatusBadRequest)
 		return
 	}
 
@@ -34,7 +43,8 @@ func (handler *Handler) login(w http.ResponseWriter, r *http.Request) {
 	var userLoginRequest model.UserLoginRequest
 	err := json.NewDecoder(r.Body).Decode(&userLoginRequest)
 	if err != nil {
-		log.Printf("Can't decode body: %v", err)
+		responseMessage := "Can't decode body"
+		log.Printf("%s: %v", responseMessage, err)
 		http.Error(w, "Can't decode body", http.StatusBadRequest)
 		return
 	}
@@ -43,8 +53,9 @@ func (handler *Handler) login(w http.ResponseWriter, r *http.Request) {
 	handler.LoggedUsers.Lock()
 	defer handler.LoggedUsers.Unlock()
 	if _, ok := handler.LoggedUsers.Users[userLoginRequest.Username]; ok {
-		log.Printf("User %s is already logged in", userLoginRequest.Username)
-		http.Error(w, "User is already logged in", http.StatusConflict)
+		responseMessage := fmt.Sprintf("User %s is already logged in", userLoginRequest.Username)
+		log.Print(responseMessage)
+		http.Error(w, responseMessage, http.StatusConflict)
 		return
 	}
 
@@ -58,7 +69,7 @@ func (handler *Handler) login(w http.ResponseWriter, r *http.Request) {
 
 	// If everything is ok, finally return the token
 	log.Printf("User %s logged in with token %s", userLoginRequest.Username, token)
-	fmt.Fprint(w, token)
+	json.NewEncoder(w).Encode(model.UserLoginResponse{Token: token})
 }
 
 // homepage is a handler function that returns a welcome message to the user.
