@@ -71,8 +71,8 @@ func TestLoginRequestInvalidRequestMethod(t *testing.T) {
 					received, expected)
 			}
 
-			handlerFixture.LoggedUsers.Lock()
-			defer handlerFixture.LoggedUsers.Unlock()
+			handlerFixture.LoggedUsers.RLock()
+			defer handlerFixture.LoggedUsers.RUnlock()
 			if len(handlerFixture.LoggedUsers.Users) != 0 {
 				t.Errorf("The list of logged users should be empty")
 			}
@@ -108,8 +108,8 @@ func TestLoginRequestBodyMissing(t *testing.T) {
 			received, expected)
 	}
 
-	handlerFixture.LoggedUsers.Lock()
-	defer handlerFixture.LoggedUsers.Unlock()
+	handlerFixture.LoggedUsers.RLock()
+	defer handlerFixture.LoggedUsers.RUnlock()
 	if len(handlerFixture.LoggedUsers.Users) != 0 {
 		t.Errorf("The list of logged users should be empty")
 	}
@@ -143,8 +143,8 @@ func TestLoginRequestCanNotDecodeBody(t *testing.T) {
 			received, expected)
 	}
 
-	handlerFixture.LoggedUsers.Lock()
-	defer handlerFixture.LoggedUsers.Unlock()
+	handlerFixture.LoggedUsers.RLock()
+	defer handlerFixture.LoggedUsers.RUnlock()
 	if len(handlerFixture.LoggedUsers.Users) != 0 {
 		t.Errorf("The list of logged users should be empty")
 	}
@@ -178,8 +178,8 @@ func TestLoginSuccess(t *testing.T) {
 			received, expected)
 	}
 
-	handlerFixture.LoggedUsers.Lock()
-	defer handlerFixture.LoggedUsers.Unlock()
+	handlerFixture.LoggedUsers.RLock()
+	defer handlerFixture.LoggedUsers.RUnlock()
 
 	if _, ok := handlerFixture.LoggedUsers.Users["user"]; !ok {
 		t.Errorf("User should be present in the list of logged users")
@@ -223,8 +223,8 @@ func TestLoginUserAlreadyLoggedIn(t *testing.T) {
 			received, expected)
 	}
 
-	handlerFixture.LoggedUsers.Lock()
-	defer handlerFixture.LoggedUsers.Unlock()
+	handlerFixture.LoggedUsers.RLock()
+	defer handlerFixture.LoggedUsers.RUnlock()
 	if _, ok := handlerFixture.LoggedUsers.Users["user"]; !ok {
 		t.Errorf("User should be present the list of logged users")
 	}
@@ -273,8 +273,8 @@ func TestLogoutRequestInvalidRequestMethod(t *testing.T) {
 					received, expected)
 			}
 
-			handlerFixture.LoggedUsers.Lock()
-			defer handlerFixture.LoggedUsers.Unlock()
+			handlerFixture.LoggedUsers.RLock()
+			defer handlerFixture.LoggedUsers.RUnlock()
 			if len(handlerFixture.LoggedUsers.Users) != 0 {
 				t.Errorf("The list of logged users should be empty")
 			}
@@ -310,8 +310,8 @@ func TestLogoutRequestBodyMissing(t *testing.T) {
 			received, expected)
 	}
 
-	handlerFixture.LoggedUsers.Lock()
-	defer handlerFixture.LoggedUsers.Unlock()
+	handlerFixture.LoggedUsers.RLock()
+	defer handlerFixture.LoggedUsers.RUnlock()
 	if len(handlerFixture.LoggedUsers.Users) != 0 {
 		t.Errorf("The list of logged users should be empty")
 	}
@@ -345,8 +345,8 @@ func TestLogoutRequestCanNotDecodeBody(t *testing.T) {
 			received, expected)
 	}
 
-	handlerFixture.LoggedUsers.Lock()
-	defer handlerFixture.LoggedUsers.Unlock()
+	handlerFixture.LoggedUsers.RLock()
+	defer handlerFixture.LoggedUsers.RUnlock()
 	if len(handlerFixture.LoggedUsers.Users) != 0 {
 
 		t.Errorf("The list of logged users should be empty")
@@ -381,8 +381,8 @@ func TestLogoutUserNotLoggedIn(t *testing.T) {
 			received, expected)
 	}
 
-	handlerFixture.LoggedUsers.Lock()
-	defer handlerFixture.LoggedUsers.Unlock()
+	handlerFixture.LoggedUsers.RLock()
+	defer handlerFixture.LoggedUsers.RUnlock()
 	if len(handlerFixture.LoggedUsers.Users) != 0 {
 		t.Errorf("There should be only one user in the list of logged users")
 	}
@@ -421,8 +421,8 @@ func TestLogoutSuccess(t *testing.T) {
 			received, expected)
 	}
 
-	handlerFixture.LoggedUsers.Lock()
-	defer handlerFixture.LoggedUsers.Unlock()
+	handlerFixture.LoggedUsers.RLock()
+	defer handlerFixture.LoggedUsers.RUnlock()
 	if _, ok := handlerFixture.LoggedUsers.Users["user"]; ok {
 		t.Errorf("User should be removed from the list of logged users")
 	}
@@ -465,8 +465,8 @@ func TestLogoutInvalidToken(t *testing.T) {
 			received, expected)
 	}
 
-	handlerFixture.LoggedUsers.Lock()
-	defer handlerFixture.LoggedUsers.Unlock()
+	handlerFixture.LoggedUsers.RLock()
+	defer handlerFixture.LoggedUsers.RUnlock()
 	if _, ok := handlerFixture.LoggedUsers.Users["user"]; !ok {
 		t.Errorf("User should not be removed from the list of logged users")
 	}

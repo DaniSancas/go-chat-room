@@ -14,6 +14,6 @@ type Users map[string]User
 // LoggedUsers is a struct that represents the users that are currently logged in.
 // It has a mutex to ensure thread safety and a Users object to store the users.
 type LoggedUsers struct {
-	sync.Mutex
+	sync.RWMutex
 	Users Users
 }

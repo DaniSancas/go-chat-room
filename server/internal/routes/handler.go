@@ -49,6 +49,7 @@ func (handler *Handler) login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if the user is already logged in, in which case return an error
+	// Aquire lock in write mode
 	handler.LoggedUsers.Lock()
 	defer handler.LoggedUsers.Unlock()
 	if _, ok := handler.LoggedUsers.Users[userLoginRequest.Username]; ok {
@@ -106,6 +107,7 @@ func (handler *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if the user is not logged in, in which case return an error
+	// Aquire lock in write mode
 	handler.LoggedUsers.Lock()
 	defer handler.LoggedUsers.Unlock()
 	if _, ok := handler.LoggedUsers.Users[userLogoutRequest.Username]; !ok {
