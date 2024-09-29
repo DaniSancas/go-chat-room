@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"log"
 	"net/http"
+	"github.com/rs/cors"
 )
 
 // Handler is a struct that contains the shared state of the server.
@@ -147,10 +148,20 @@ func HandleRequests() {
 		},
 	}
 
+	// Enable CORS
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedHeaders: []string{"*"},
+		AllowCredentials: true,
+		// Enable Debugging for testing, consider disabling in production
+		Debug: true,
+	})
+
 	// Start server
 	log.Println("Starting server...")
-	http.HandleFunc("/", homepage)
-	http.HandleFunc("/login", handler.login)
-	http.HandleFunc("/logout", handler.logout)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", homepage)
+	mux.HandleFunc("/login", handler.login)
+	mux.HandleFunc("/logout", handler.logout)
+	log.Fatal(http.ListenAndServe(":8080", c.Handler(mux)))
 }
