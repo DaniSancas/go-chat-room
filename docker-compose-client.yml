@@ -1,0 +1,10 @@
+name: go-chat-room 
+
+services:
+  frontend:
+    image: nginx:alpine
+    container_name: frontend
+    ports:
+      - "8081:80"
+    volumes:
+      - ./client/app:/usr/share/nginx/html:ro

@@ -1,0 +1,10 @@
+name: go-chat-room 
+
+services:
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: backend
+    ports:
+      - "8080:8080"
