@@ -1,8 +1,19 @@
+<!DOCTYPE html>
 <html>
     <head>
         <title>Chat Room</title>
+        <script src="https://code.jquery.com/jquery-3.7.1.js" integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4=" crossorigin="anonymous"></script>
+        <script src="./core.js"></script>
     </head>
     <body>
         <h1>Hello!</h1>
+        <div id="login-form">
+            <input type="text" id="login-username" placeholder="">
+            <button id="login-button">Login</button>
+        </div>
+        <div id="logout-form" style="display: none;">
+            <span id="logout-username"></span> 
+            <button id="logout-button">Logout</button>
+        </div>
     </body>
 </html>
