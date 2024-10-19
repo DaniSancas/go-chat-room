@@ -2,6 +2,7 @@ package routes
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -136,19 +137,31 @@ func (handler *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Remove the user from the logged users, closing the channel if it exists
-	userToLogout := handler.LoggedUsers.Users[userLogoutRequest.Username]
-	if userToLogout.Channel != nil {
-		close(userToLogout.Channel)
-		log.Printf("User %s disconnected from the stream", userLogoutRequest.Username)
-	}
-	delete(handler.LoggedUsers.Users, userLogoutRequest.Username)
+	CleanupUserData(handler, userLogoutRequest)
 
 	// If everything is ok, finally return the token
 	log.Printf("User %s successfully logged out", userLogoutRequest.Username)
 	json.NewEncoder(w).Encode(model.UserLogoutResponse{Message: "User successfully logged out"})
 }
 
-// stream is a handler function that streams messages to the user. 
+// CleanupUserData removes the user from the logged users, closing the channel if it exists.
+func CleanupUserData(handler *Handler, userLogoutRequest model.UserWithTokenRequest) {
+	DisconnectChannel(handler, userLogoutRequest)
+	delete(handler.LoggedUsers.Users, userLogoutRequest.Username)
+	log.Println("User removed from the logged users")
+}
+
+// DisconnectChannel closes the channel of the user if it exists.
+func DisconnectChannel(handler *Handler, userLogoutRequest model.UserWithTokenRequest) {
+	userToLogout := handler.LoggedUsers.Users[userLogoutRequest.Username]
+	if userToLogout.Channel != nil {
+		close(userToLogout.Channel)
+		log.Printf("Channel for user %s closed", userLogoutRequest.Username)
+	}
+	handler.LoggedUsers.Users[userLogoutRequest.Username] = userToLogout
+}
+
+// stream is a handler function that streams messages to the user.
 // It upgrades an HTTP connection to a websocket connection, reads the username and token from the first message, and validates the user.
 // If the user is not logged in or the token is incorrect, it returns an error.
 // If everything is ok, it starts a goroutine to send messages to the user and handles the rest of the messages in a loop.
@@ -156,6 +169,7 @@ func (handler *Handler) stream(w http.ResponseWriter, r *http.Request) {
 	websocket, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer websocket.Close()
@@ -165,18 +179,20 @@ func (handler *Handler) stream(w http.ResponseWriter, r *http.Request) {
 	messageType, messageContent, err := websocket.ReadMessage()
 	if err != nil {
 		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Parse the request body to get the user data
 	var userWithTokenRequest model.UserWithTokenRequest
-	err = json.Unmarshal(messageContent, &userWithTokenRequest)
-	if err != nil {
-		responseMessage := "Can't decode body"
-		log.Printf("%s: %v", responseMessage, err)
+	if err := json.Unmarshal(messageContent, &userWithTokenRequest); err != nil {
+		responseMessage := fmt.Sprintf("%s: %v", "Can't decode body", err)
+		log.Println(responseMessage)
+		http.Error(w, responseMessage, http.StatusBadRequest)
 
 		if err := websocket.WriteMessage(messageType, []byte(responseMessage)); err != nil {
 			log.Println(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		return
@@ -185,30 +201,45 @@ func (handler *Handler) stream(w http.ResponseWriter, r *http.Request) {
 	// Check if the provided username and token are valid
 	// In case the currentUser is logged in and the token is correct, create a channel and add it to the logged users map.
 	// Should return true if the user is not logged in or the token is incorrect, and false otherwise.
-	shouldReturn := BindChannelToUserIfExists(handler, userWithTokenRequest, websocket, messageType)
-	if shouldReturn {
+	if err := BindChannelToUserIfExists(handler, userWithTokenRequest, websocket, messageType); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 
 	// Start a goroutine to send messages to the user from the channel
 	go func() {
+		// TODO this function should be refactored to handle the case when the user is disconnected
+		//  and the channel is closed. In that case, the goroutine should end.
+		//  This can be done by checking if the channel is closed, and if it is, break the loop.
+		defer websocket.Close()
+		defer log.Printf("Websocket connection closed for user %s", userWithTokenRequest.Username)
 		for {
-			message := <-handler.LoggedUsers.Users[userWithTokenRequest.Username].Channel
-			if err := websocket.WriteMessage(messageType, message); err != nil {
-				log.Println(err)
-				return
+			// Check if the channel is closed
+			// Read the message from the channel and send it to the user
+			if message, ok := <-handler.LoggedUsers.Users[userWithTokenRequest.Username].Channel; !ok {
+				break
+			} else {
+				if err := websocket.WriteMessage(messageType, message); err != nil {
+					log.Println(err)
+					break
+				}
 			}
 		}
 	}()
 
-	// Handle the rest of the messages in a loop
+	// Handle the rest of the messages in a loop, until the connection is closed
 	handler.listenForMessages(websocket)
+
+	// Close the channel, as the websocket connection is closed
+	handler.LoggedUsers.Lock()
+	defer handler.LoggedUsers.Unlock()
+	DisconnectChannel(handler, userWithTokenRequest)
 }
 
 // BindChannelToUserIfExists checks if the user is logged in and if the token is correct.
 // If the user is logged in and the token is correct, it creates a channel for the user and adds it to the logged users map.
-// It returns true if the user is not logged in or the token is incorrect, and false otherwise.
-func BindChannelToUserIfExists(handler *Handler, userWithTokenRequest model.UserWithTokenRequest, websocket *websocket.Conn, messageType int) bool {
+// It returns error if the user is not logged in or the token is incorrect, and nil otherwise.
+func BindChannelToUserIfExists(handler *Handler, userWithTokenRequest model.UserWithTokenRequest, websocket *websocket.Conn, messageType int) error {
 	handler.LoggedUsers.Lock()
 	defer handler.LoggedUsers.Unlock()
 	if _, ok := handler.LoggedUsers.Users[userWithTokenRequest.Username]; !ok {
@@ -217,9 +248,9 @@ func BindChannelToUserIfExists(handler *Handler, userWithTokenRequest model.User
 
 		if err := websocket.WriteMessage(messageType, []byte(responseMessage)); err != nil {
 			log.Println(err)
-			return true
+			return err
 		}
-		return true
+		return errors.New(responseMessage)
 	}
 
 	if handler.LoggedUsers.Users[userWithTokenRequest.Username].Token != userWithTokenRequest.Token {
@@ -228,25 +259,26 @@ func BindChannelToUserIfExists(handler *Handler, userWithTokenRequest model.User
 
 		if err := websocket.WriteMessage(messageType, []byte(responseMessage)); err != nil {
 			log.Println(err)
-			return true
+			return err
 		}
-		return true
+		return errors.New(responseMessage)
 	}
 
 	currentUser := handler.LoggedUsers.Users[userWithTokenRequest.Username]
 	currentUser.Channel = make(chan []byte)
 	handler.LoggedUsers.Users[userWithTokenRequest.Username] = currentUser
 	log.Printf("User %s is now connected to the stream", userWithTokenRequest.Username)
-	return false
+	return nil
 }
 
+// listenForMessages is a helper function that listens for messages from the user and parses them.
 func (handler *Handler) listenForMessages(conn *websocket.Conn) {
 	for {
 		// read a message
 		messageType, messageContent, err := conn.ReadMessage()
 		if err != nil {
 			log.Println(err)
-			return
+			break
 		}
 
 		// print out that message
@@ -257,7 +289,7 @@ func (handler *Handler) listenForMessages(conn *websocket.Conn) {
 
 		if err := conn.WriteMessage(messageType, []byte(messageResponse)); err != nil {
 			log.Println(err)
-			return
+			break
 		}
 	}
 }
