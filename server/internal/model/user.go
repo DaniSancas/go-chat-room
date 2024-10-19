@@ -6,6 +6,7 @@ import "sync"
 type User struct {
 	Username string
 	Token    string
+	Channel  chan []byte
 }
 
 // Users is a map of usernames to User objects. The key is the username and the value is the User object.
