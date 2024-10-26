@@ -10,3 +10,6 @@ down:
 
 logs:
 	$(all_configs) logs -f --timestamps
+
+test:
+	./scripts/test_all.sh ./server
