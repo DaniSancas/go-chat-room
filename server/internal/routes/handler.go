@@ -227,6 +227,24 @@ func (handler *Handler) stream(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	// Send a welcome message to the user
+	welcomeMessage := model.WebsocketWelcomeResponse{
+		Welcome: userWithTokenRequest.Username,
+	}
+	// Marshal the welcome message to JSON
+	msg, err := json.Marshal(welcomeMessage)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Send the welcome message to the user
+	if err := websocket.WriteMessage(messageType, msg); err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// Handle the rest of the messages in a loop, until the connection is closed
 	handler.listenForMessages(websocket)
 

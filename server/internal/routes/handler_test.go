@@ -1,12 +1,14 @@
 package routes
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/DaniSancas/go-chat-room/server/internal/model"
+	"github.com/gorilla/websocket"
 )
 
 func TestHomepage(t *testing.T) {
@@ -473,5 +475,66 @@ func TestLogoutInvalidToken(t *testing.T) {
 
 	if len(handlerFixture.LoggedUsers.Users) != 1 {
 		t.Errorf("There should be only one user in the list of logged users")
+	}
+}
+
+func TestWebsocketConnection(t *testing.T) {
+	message := model.UserWithTokenRequest{
+		Username: "user",
+		Token:    "some-token",
+	}
+
+	handlerFixture := Handler{
+		LoggedUsers: model.LoggedUsers{
+			Users: model.Users{
+				"user": model.User{
+					Username: message.Username,
+					Token:    message.Token,
+				},
+			},
+		},
+	}
+
+	// Create a test server with the WebSocket handler
+	server := httptest.NewServer(http.HandlerFunc(handlerFixture.stream))
+	defer server.Close()
+
+	// Connect to the WebSocket
+	url := "ws" + server.URL[4:] + "/stream" // Change http to ws
+	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		t.Fatalf("Failed to connect to WebSocket: %v", err)
+	}
+	defer conn.Close()
+
+	// Prepare the message
+	msg, err := json.Marshal(message)
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Send the message
+	err = conn.WriteMessage(websocket.TextMessage, msg)
+	if err != nil {
+		t.Fatalf("Failed to send message: %v", err)
+	}
+
+	// Read the response
+	_, response, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("Failed to read message: %v", err)
+	}
+	// Unmarshal the response to WebsocketWelcomeResponse
+	var welcome model.WebsocketWelcomeResponse
+	err = json.Unmarshal(response, &welcome)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+
+	// Evaluate if the logged user has a channel created after the first message is sent
+	handlerFixture.LoggedUsers.RLock()
+	defer handlerFixture.LoggedUsers.RUnlock()
+	if handlerFixture.LoggedUsers.Users["user"].Channel == nil {
+		t.Errorf("User should have a channel created")
 	}
 }
