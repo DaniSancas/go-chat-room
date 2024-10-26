@@ -11,5 +11,8 @@ down:
 logs:
 	$(all_configs) logs -f --timestamps
 
+build:
+	(cd ./server && go build -o ./bin/server ./cmd/api/main.go)
+
 test:
 	./scripts/test_all.sh ./server
