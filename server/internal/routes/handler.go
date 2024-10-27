@@ -24,6 +24,10 @@ type Handler struct {
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		// Allow all connections by default
+		return true
+	},
 }
 
 // login is a handler function that logs in a user. It receives a POST request with a JSON body containing the username of the user.
@@ -145,6 +149,7 @@ func (handler *Handler) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 // CleanupUserData removes the user from the logged users, closing the channel if it exists.
+// This function assumes that the LoggedUsers lock is already acquired by the caller.
 func CleanupUserData(handler *Handler, userLogoutRequest model.UserWithTokenRequest) {
 	DisconnectChannel(handler, userLogoutRequest)
 	delete(handler.LoggedUsers.Users, userLogoutRequest.Username)
@@ -248,10 +253,10 @@ func (handler *Handler) stream(w http.ResponseWriter, r *http.Request) {
 	// Handle the rest of the messages in a loop, until the connection is closed
 	handler.listenForMessages(websocket)
 
-	// Close the channel, as the websocket connection is closed
+	// Remove the user from the logged users, closing the channel if it exists
 	handler.LoggedUsers.Lock()
 	defer handler.LoggedUsers.Unlock()
-	DisconnectChannel(handler, userWithTokenRequest)
+	CleanupUserData(handler, userWithTokenRequest)
 }
 
 // BindChannelToUserIfExists checks if the user is logged in and if the token is correct.
